@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
-export function ThemeToggle() {
+export function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window !== "undefined") {
       return document.documentElement.classList.contains("light")
@@ -27,11 +27,13 @@ export function ThemeToggle() {
       title="Toggle theme"
     >
       {theme === "dark" ? (
-        <Sun className="w-4 h-4" />
+        <Sun className="w-5 h-5" />
       ) : (
-        <Moon className="w-4 h-4" />
+        <Moon className="w-5 h-5" />
       )}
-      <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+      {!collapsed && (
+        <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+      )}
     </button>
   );
 }
