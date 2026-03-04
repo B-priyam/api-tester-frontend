@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -8,8 +8,11 @@ import {
   FileJson,
   Code,
   FileText,
+  Upload,
+  X,
+  File as FileIcon,
 } from "lucide-react";
-import type { KeyValuePair, HttpMethod } from "./RequestBuilder";
+import type { KeyValuePair, HttpMethod, FormDataEntry } from "./RequestBuilder";
 
 interface RequestTabsProps {
   headers: KeyValuePair[];
@@ -25,6 +28,8 @@ interface RequestTabsProps {
   authToken: string;
   setAuthToken: (t: string) => void;
   method: HttpMethod;
+  formDataEntries: FormDataEntry[] | any;
+  setFormDataEntries: (entries: FormDataEntry[] | any) => void;
 }
 
 type TabId = "params" | "headers" | "body" | "auth";
@@ -99,6 +104,271 @@ function KeyValueEditor({
       ))}
       <button
         onClick={addPair}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-2"
+      >
+        <Plus className="w-3 h-3" />
+        Add Row
+      </button>
+    </div>
+  );
+}
+
+function FormDataEditor({
+  entries,
+  onChange,
+}: {
+  entries: FormDataEntry[];
+  onChange: (entries: FormDataEntry[]) => void;
+}) {
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [globalDragOver, setGlobalDragOver] = useState(false);
+
+  const updateEntry = (id: string, field: keyof FormDataEntry, val: any) => {
+    onChange(entries.map((e) => (e.id === id ? { ...e, [field]: val } : e)));
+  };
+
+  const toggleType = (id: string) => {
+    onChange(
+      entries.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              type: e.type === "text" ? "file" : "text",
+              value: "",
+              files: undefined,
+            }
+          : e,
+      ),
+    );
+  };
+
+  const addFiles = (id: string, newFiles: File[]) => {
+    onChange(
+      entries.map((e) =>
+        e.id === id ? { ...e, files: [...(e.files || []), ...newFiles] } : e,
+      ),
+    );
+  };
+
+  const handleFileChange = (id: string, fileList: FileList | null) => {
+    if (!fileList) return;
+    addFiles(id, Array.from(fileList));
+  };
+
+  const handleDrop = (id: string, e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(null);
+    setGlobalDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(id, Array.from(e.dataTransfer.files));
+      // Auto-switch to file type if it was text
+      const entry = entries.find((en) => en.id === id);
+      if (entry && entry.type === "text") {
+        onChange(
+          entries.map((en) =>
+            en.id === id
+              ? {
+                  ...en,
+                  type: "file" as const,
+                  value: "",
+                  files: [
+                    ...(en.files || []),
+                    ...Array.from(e.dataTransfer.files),
+                  ],
+                }
+              : en,
+          ),
+        );
+        return;
+      }
+    }
+  };
+
+  const handleGlobalDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGlobalDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      // Add to a new file entry
+      const newId = Date.now().toString();
+      onChange([
+        ...entries,
+        {
+          key: "file",
+          value: "",
+          type: "file",
+          enabled: true,
+          id: newId,
+          files,
+        },
+      ]);
+    }
+  };
+
+  const removeFile = (entryId: string, fileIndex: number) => {
+    onChange(
+      entries.map((e) =>
+        e.id === entryId
+          ? { ...e, files: (e.files || []).filter((_, i) => i !== fileIndex) }
+          : e,
+      ),
+    );
+  };
+
+  const addEntry = () => {
+    onChange([
+      ...entries,
+      {
+        key: "",
+        value: "",
+        type: "text",
+        enabled: true,
+        id: Date.now().toString(),
+      },
+    ]);
+  };
+
+  const removeEntry = (id: string) => {
+    if (entries.length <= 1) return;
+    onChange(entries.filter((e) => e.id !== id));
+  };
+
+  return (
+    <div
+      className="space-y-2 relative"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setGlobalDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setGlobalDragOver(false);
+      }}
+      onDrop={handleGlobalDrop}
+    >
+      {/* Global drop zone overlay */}
+      {globalDragOver && entries.every((e) => e.type !== "file") && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-primary">
+            <Upload className="w-8 h-8" />
+            <span className="text-sm font-medium">
+              Drop files to add a new entry
+            </span>
+          </div>
+        </div>
+      )}
+
+      {entries.map((entry, i) => (
+        <motion.div
+          key={entry.id}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: i * 0.03 }}
+          className="space-y-1.5"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={entry.enabled}
+              onChange={(e) =>
+                updateEntry(entry.id, "enabled", e.target.checked)
+              }
+              className="w-3.5 h-3.5 rounded border-border accent-primary"
+            />
+            <input
+              placeholder="Key"
+              value={entry.key}
+              onChange={(e) => updateEntry(entry.id, "key", e.target.value)}
+              className="flex-1 px-3 py-1.5 rounded-md surface-2 border border-border text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            <button
+              onClick={() => toggleType(entry.id)}
+              className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium border transition-colors ${
+                entry.type === "file"
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "surface-2 text-muted-foreground border-border hover:text-foreground"
+              }`}
+            >
+              {entry.type === "file" ? "File" : "Text"}
+            </button>
+            {entry.type === "text" ? (
+              <input
+                placeholder="Value"
+                value={entry.value}
+                onChange={(e) => updateEntry(entry.id, "value", e.target.value)}
+                className="flex-1 px-3 py-1.5 rounded-md surface-2 border border-border text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+            ) : (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverId(entry.id);
+                }}
+                onDragLeave={() => setDragOverId(null)}
+                onDrop={(e) => handleDrop(entry.id, e)}
+                onClick={() => fileInputRefs.current[entry.id]?.click()}
+                className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md surface-2 border border-dashed text-sm cursor-pointer transition-all ${
+                  dragOverId === entry.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>
+                  {dragOverId === entry.id
+                    ? "Drop files here"
+                    : entry.files?.length
+                      ? `${entry.files.length} file(s)`
+                      : "Drop files or click to browse..."}
+                </span>
+                <input
+                  ref={(el) => {
+                    fileInputRefs.current[entry.id] = el;
+                  }}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFileChange(entry.id, e.target.files)}
+                />
+              </div>
+            )}
+            <button
+              onClick={() => removeEntry(entry.id)}
+              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* Show selected files */}
+          {entry.type === "file" && entry.files && entry.files.length > 0 && (
+            <div className="ml-6 flex flex-wrap gap-1.5">
+              {entry.files.map((file, fi) => (
+                <span
+                  key={fi}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md surface-2 border border-border text-[11px] text-foreground"
+                >
+                  <FileIcon className="w-3 h-3 text-muted-foreground" />
+                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  <span className="text-muted-foreground">
+                    ({(file.size / 1024).toFixed(1)}KB)
+                  </span>
+                  <button
+                    onClick={() => removeFile(entry.id, fi)}
+                    className="text-muted-foreground hover:text-destructive ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      ))}
+      <button
+        onClick={addEntry}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-2"
       >
         <Plus className="w-3 h-3" />
@@ -193,9 +463,9 @@ export function RequestTabs(props: RequestTabsProps) {
               ))}
             </div>
             {props.bodyType === "formdata" ? (
-              <KeyValueEditor
-                pairs={[{ key: "", value: "", enabled: true, id: "fd1" }]}
-                onChange={() => {}}
+              <FormDataEditor
+                entries={props.formDataEntries}
+                onChange={props.setFormDataEntries}
               />
             ) : (
               <textarea
