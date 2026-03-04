@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   BarChart3,
   Activity,
+  AlertTriangleIcon,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -436,7 +437,12 @@ export function LoadTesting({
           </button>
         </div>
       </div>
-
+      <div className="border border-yellow-700 bg-amber-200 text-black rounded-full m-2 flex items-center flex-row justify-center">
+        <AlertTriangleIcon className="size-4 " />
+        <p className="text-sm px-2 py-1 text-center">
+          This feature is under development and might show inaccurate data.
+        </p>
+      </div>
       <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-6">
         {/* URL & Method */}
         <motion.div
