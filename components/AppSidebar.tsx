@@ -101,7 +101,7 @@ export function AppSidebar({ activeTab, onTabChange }: SidebarProps) {
           collapsed ? "w-20" : "w-60"
         }`}
       >
-        {/* Logo */}
+        {/* Logo Part*/}
         <div className="flex items-center justify-between px-4 h-14 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center glow-primary">
